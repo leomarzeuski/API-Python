@@ -11,7 +11,7 @@ bucket_name = "cyclic-cute-puce-colt-tutu-sa-east-1"
 
 app = Flask(__name__)
 
-folder = './output'
+folder = '/tmp'
 
 def set_current_date_time():
     current_datetime = datetime.now()
@@ -37,7 +37,7 @@ def hello_world():
 
         current_date_time = set_current_date_time()
 
-        local_file = f'{folder}/pfx_{current_date_time}'
+        local_file = f'/tmp/pfx_{current_date_time}'
 
         os.makedirs(folder, exist_ok=True)
 
