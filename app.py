@@ -4,6 +4,10 @@ from OpenSSL import crypto
 import os
 import requests
 from reportlab.pdfgen import canvas
+import boto3
+
+s3 = boto3.client('s3')
+bucket_name = "cyclic-cute-puce-colt-tutu-sa-east-1"
 
 app = Flask(__name__)
 
@@ -56,9 +60,7 @@ def transform_pfx_in_pdf(pfx_file_url, local_file):
 def download_file(url, local_filename):
     with requests.get(url, stream=True) as response:
         response.raise_for_status()
-        with open(local_filename, 'wb') as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
+        s3.put_object(Body=response.content, Bucket=bucket_name, Key=local_filename)
 
 
 def load_certificate_and_key(pfx_path, password):
@@ -79,6 +81,9 @@ def create_pdf(signature, output_file):
         c.drawString(100, 800 - i * 100, f'{key}: {value}')
 
     c.save()
+
+    with open(output_file, "rb") as f:
+        s3.put_object(Body=f.read(), Bucket=bucket_name, Key=output_file)
 
 def generate_key_and_sign(pfx_path, password, output_file):
     private_key, certificate = load_certificate_and_key(pfx_path, password)
