@@ -2,3 +2,4 @@ Flask
 pyOpenSSL
 requests
 reportlab
+boto3
