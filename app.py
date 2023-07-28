@@ -64,8 +64,9 @@ def download_file(url, local_filename):
 
 
 def load_certificate_and_key(pfx_path, password):
-    with open(pfx_path, "rb") as f:
-        pfx_data = f.read()
+    # Get the PFX file from S3
+    pfx_file = s3.get_object(Bucket=bucket_name, Key=pfx_path)
+    pfx_data = pfx_file['Body'].read()
 
     pfx = crypto.load_pkcs12(pfx_data, password)
 
