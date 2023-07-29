@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from OpenSSL import crypto
 import os
 import requests
@@ -8,7 +8,6 @@ import boto3
 
 s3 = boto3.client('s3')
 bucket_name = "cyclic-outrageous-jay-bathing-suit-sa-east-1"
-
 
 app = Flask(__name__)
 
@@ -46,9 +45,9 @@ def hello_world():
 
         output_file = f'{local_file}.pdf'
 
-        generate_key_and_sign(local_filename, pfx_password, output_file)
+        signature = generate_key_and_sign(local_filename, pfx_password, output_file)
 
-        return 'Signature generated successfully!', 200
+        return jsonify({'message': 'Signature generated successfully!', 'signature': signature}), 200
     except Exception as e:
         app.logger.error(f'Error: {e}')
         return str(e), 500
@@ -99,6 +98,8 @@ def generate_key_and_sign(pfx_path, password, output_file):
     }
 
     create_pdf(signature, output_file)
+
+    return signature  # Return the signature
 
 if __name__ == '__main__':
     app.run(debug=True)
