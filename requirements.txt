@@ -4,4 +4,5 @@ requests
 reportlab
 boto3
 endesive==2.0.16
+swig
 
