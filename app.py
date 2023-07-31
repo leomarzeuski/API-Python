@@ -90,6 +90,7 @@ def generate_key_and_sign(pfx_path, password, output_file):
     private_key, certificate = load_certificate_and_key(pfx_path, password)
 
     signature = {
+        'id': str(certificate.get_serial_number()),  # Add the certificate ID
         'name/cpf': certificate.get_subject().CN,
         'type': certificate.get_subject().OU,
         'bir': certificate.get_subject().O,
@@ -100,6 +101,7 @@ def generate_key_and_sign(pfx_path, password, output_file):
     create_pdf(signature, output_file)
 
     return signature  # Return the signature
+
 
 if __name__ == '__main__':
     app.run(debug=True)
