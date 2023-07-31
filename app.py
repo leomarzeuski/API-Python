@@ -5,6 +5,7 @@ import os
 import requests
 from reportlab.pdfgen import canvas
 import boto3
+from endesive import pdf
 
 s3 = boto3.client('s3')
 bucket_name = "cyclic-outrageous-jay-bathing-suit-sa-east-1"
@@ -86,6 +87,18 @@ def create_pdf(signature, output_file):
     with open(output_file, "rb") as f:
         s3.put_object(Body=f.read(), Bucket=bucket_name, Key=output_file)
 
+def verify_signature(output_file):
+    with open(output_file, "rb") as f:
+        data = f.read()
+
+    result = pdf.verify(data)
+
+    if result:
+        return True
+    else:
+        return False
+
+
 def generate_key_and_sign(pfx_path, password, output_file):
     private_key, certificate = load_certificate_and_key(pfx_path, password)
 
@@ -99,6 +112,10 @@ def generate_key_and_sign(pfx_path, password, output_file):
     }
 
     create_pdf(signature, output_file)
+
+    is_valid = verify_signature(output_file)
+
+    signature['is_valid'] = is_valid
 
     return signature  # Return the signature
 
