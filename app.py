@@ -7,7 +7,7 @@ from reportlab.pdfgen import canvas
 import boto3
 
 s3 = boto3.client('s3')
-bucket_name = "cyclic-outrageous-jay-bathing-suit-sa-east-1"
+bucket_name = "cyclic-drab-lime-lizard-garb-sa-east-1"
 
 app = Flask(__name__)
 
