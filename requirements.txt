@@ -3,5 +3,4 @@ pyOpenSSL==21.0.0
 requests==2.26.0
 reportlab==3.6.1
 boto3==1.18.27
-endesive==2.0.16
-swig==4.0.2
+
