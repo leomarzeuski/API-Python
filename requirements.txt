@@ -1,1 +1,1 @@
-pip3 install --user Flask pyOpenSSL requests reportlab boto3 endesive
+pip3 install Flask pyOpenSSL requests reportlab boto3 endesive
