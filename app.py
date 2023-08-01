@@ -75,6 +75,7 @@ def load_certificate_and_key(pfx_path, password):
 
     return private_key, certificate
 
+#teste
 def generate_key_and_sign(pfx_path, password, output_file):
     private_key, certificate = load_certificate_and_key(pfx_path, password)
 
