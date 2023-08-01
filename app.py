@@ -103,6 +103,16 @@ def generate_key_and_sign(pfx_path, password, output_file):
 
     create_pdf(signature, output_file)
 
+    # Generate a presigned URL for the uploaded file
+    presigned_url = s3.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': bucket_name, 'Key': output_file},
+        ExpiresIn=3600  # The URL will expire after 1 hour
+    )
+
+    # Add the presigned URL to the signature
+    signature['file_url'] = presigned_url
+
     return signature  # Return the signature
 
 
