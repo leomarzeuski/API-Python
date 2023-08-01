@@ -3,11 +3,8 @@ from flask import Flask, request, jsonify
 from OpenSSL import crypto
 import os
 import requests
-from reportlab.pdfgen import canvas
+from endesive import pdf
 import boto3
-from pyhanko.sign import signers, fields
-from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
-from pyhanko.pdf_utils.reader import PdfFileReader
 
 s3 = boto3.client('s3')
 bucket_name = "cyclic-weak-pear-pig-tux-sa-east-1"
@@ -78,19 +75,33 @@ def load_certificate_and_key(pfx_path, password):
 
     return private_key, certificate
 
-def create_pdf(signature, output_file):
-    c = canvas.Canvas(output_file)
-
-    for i, (key, value) in enumerate(signature.items()):
-        c.drawString(100, 800 - i * 100, f'{key}: {value}')
-
-    c.save()
-
-    with open(output_file, "rb") as f:
-        s3.put_object(Body=f.read(), Bucket=bucket_name, Key=output_file)
-
 def generate_key_and_sign(pfx_path, password, output_file):
     private_key, certificate = load_certificate_and_key(pfx_path, password)
+
+    # Create an empty PDF
+    c = canvas.Canvas(output_file)
+    c.save()
+
+    # Sign the PDF
+    with open(output_file, "rb+") as f:
+        pdf.sign(datau=f.read(),
+                 udct={"sigflags": 3},
+                 key=private_key,
+                 cert=certificate,
+                 othercerts=[],
+                 algomd="sha256",
+                 hsm=None,
+                 password=password,
+                 efitz=None,
+                 name=certificate.get_subject().CN,
+                 location=certificate.get_subject().L,
+                 reason=certificate.get_subject().ST,
+                 contact=certificate.get_subject().emailAddress,
+                 signerflags=pdf.fpdf.PDF_SIGNER_CERTIFICATE)
+
+    # Upload the signed PDF to S3
+    with open(output_file, "rb") as f:
+        s3.put_object(Body=f.read(), Bucket=bucket_name, Key=output_file)
 
     signature = {
         'id': str(certificate.get_serial_number()),  # Add the certificate ID
@@ -100,18 +111,6 @@ def generate_key_and_sign(pfx_path, password, output_file):
         'address': certificate.get_subject().L,
         'signature_text': certificate.get_subject().ST
     }
-
-    create_pdf(signature, output_file)
-
-    # Generate a presigned URL for the uploaded file
-    presigned_url = s3.generate_presigned_url(
-        'get_object',
-        Params={'Bucket': bucket_name, 'Key': output_file},
-        ExpiresIn=3600  # The URL will expire after 1 hour
-    )
-
-    # Add the presigned URL to the signature
-    signature['file_url'] = presigned_url
 
     return signature  # Return the signature
 
