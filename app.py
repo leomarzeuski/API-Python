@@ -10,7 +10,7 @@ from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 from pyhanko.pdf_utils.reader import PdfFileReader
 
 s3 = boto3.client('s3')
-bucket_name = "cyclic-drab-lime-lizard-garb-sa-east-1"
+bucket_name = "cyclic-weak-pear-pig-tux-sa-east-1"
 
 app = Flask(__name__)
 
