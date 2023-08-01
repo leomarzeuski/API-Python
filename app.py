@@ -5,7 +5,9 @@ import os
 import requests
 from reportlab.pdfgen import canvas
 import boto3
-from endesive import pdf
+from pyhanko.sign import signers, fields
+from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
+from pyhanko.pdf_utils.reader import PdfFileReader
 
 s3 = boto3.client('s3')
 bucket_name = "cyclic-drab-lime-lizard-garb-sa-east-1"
@@ -48,9 +50,7 @@ def hello_world():
 
         signature = generate_key_and_sign(local_filename, pfx_password, output_file)
 
-        signed_pdf_url = f"https://{bucket_name}.s3.amazonaws.com/{output_file}"
-
-        return jsonify({'message': 'Signature generated successfully!', 'signature': signature, 'signed_pdf_url': signed_pdf_url}), 200
+        return jsonify({'message': 'Signature generated successfully!', 'signature': signature}), 200
     except Exception as e:
         app.logger.error(f'Error: {e}')
         return str(e), 500
@@ -89,44 +89,6 @@ def create_pdf(signature, output_file):
     with open(output_file, "rb") as f:
         s3.put_object(Body=f.read(), Bucket=bucket_name, Key=output_file)
 
-def sign_pdf(input_pdf_path, output_pdf_path, pfx_path, password):
-    # Carregar o certificado e a chave privada do arquivo PFX
-    pfx = crypto.load_pkcs12(open(pfx_path, 'rb').read(), password)
-
-    # Definir as informações da assinatura
-    dct = {
-        "aligned": 0,
-        "sigflagsft": 1,
-        "sigpage": 0,
-        "sigbutton": True,
-        "sigfield": "Signature1",
-        "auto_sigfield": True,
-        "sigandcertify": True,
-        "signaturebox": (470, 840, 570, 640),
-        "signature": "Assinado digitalmente",
-        "contact": "email@example.com",
-        "location": "Localização",
-        "signingdate": "2020.02.20",
-        "reason": "Razão da assinatura",
-        "password": "1234",
-    }
-
-    # Ler o conteúdo do PDF
-    datau = open(input_pdf_path, 'rb').read()
-
-    # Assinar o PDF
-    datas = pdf.cms.sign(datau, dct,
-        pfx.get_privatekey().to_cryptography_key(),
-        pfx.get_certificate().to_cryptography(),
-        [],
-        "sha256"
-    )
-
-    # Escrever o PDF assinado
-    with open(output_pdf_path, 'wb') as fp:
-        fp.write(datau)
-        fp.write(datas)
-
 def generate_key_and_sign(pfx_path, password, output_file):
     private_key, certificate = load_certificate_and_key(pfx_path, password)
 
@@ -140,7 +102,6 @@ def generate_key_and_sign(pfx_path, password, output_file):
     }
 
     create_pdf(signature, output_file)
-    sign_pdf(output_file, output_file, pfx_path, password)
 
     return signature  # Return the signature
 
