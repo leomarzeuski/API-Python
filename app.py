@@ -7,7 +7,7 @@ from endesive import pdf
 import boto3
 
 s3 = boto3.client('s3')
-bucket_name = "cyclic-weak-pear-pig-tux-sa-east-1"
+bucket_name = "leozinmarz-9qrmae9om78fwj5udnnwnwnh6zgzwsae1a-s3alias"
 
 app = Flask(__name__)
 
