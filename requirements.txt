@@ -3,4 +3,4 @@ pyOpenSSL
 requests
 reportlab
 boto3
-endesive
+pyHanko
