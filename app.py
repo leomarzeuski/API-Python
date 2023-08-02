@@ -1,10 +1,14 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, jsonify
 from endesive import pdf
 import requests
 import tempfile
 import os
+import boto3
 
 app = Flask(__name__)
+
+s3 = boto3.client('s3')
+bucket_name = 'cyclic-lazy-erin-snail-gown-sa-east-1'
 
 @app.route('/sign', methods=['POST'])
 def sign_document():
@@ -40,8 +44,23 @@ def sign_document():
     # Delete the temporary file
     os.unlink(document_file.name)
 
-    # Return the signed document as a file download
-    return send_file(signed_document, as_attachment=True)
+    # Save the signed document to a temporary file
+    signed_document_file = tempfile.NamedTemporaryFile(delete=False)
+    signed_document_file.write(signed_document)
+    signed_document_file.close()
+
+    # Upload the signed document to S3
+    with open(signed_document_file.name, 'rb') as data:
+        s3.upload_fileobj(data, bucket_name, 'signed_document.pdf')
+
+    # Delete the temporary file
+    os.unlink(signed_document_file.name)
+
+    # Construct the URL of the signed document
+    url = f'https://{bucket_name}.s3.amazonaws.com/signed_document.pdf'
+
+    # Return the URL of the signed document
+    return jsonify({'url': url})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
