@@ -1,66 +1,37 @@
-from flask import Flask, request, jsonify
-from endesive import pdf
-import requests
-import tempfile
 import os
-import boto3
+from flask import Flask, request, render_template
+from werkzeug.utils import secure_filename
+from sign_pdf import generate_key_and_sign, load_certificate_and_key
 
 app = Flask(__name__)
 
-s3 = boto3.client('s3')
-bucket_name = 'cyclic-lazy-erin-snail-gown-sa-east-1'
+
+@app.route('/', methods=['GET'])
+def home():
+    return render_template('form.html')
+
 
 @app.route('/sign', methods=['POST'])
-def sign_document():
-    # Get the URL of the document to sign and the private key from the request
-    document_url = request.form.get('document_url')
-    private_key = request.form.get('private_key')
+def sign():
+    # Processar o arquivo de certificado carregado
+    pfx_file = request.files['pfx_file']
+    pfx_filename = secure_filename(pfx_file.filename)
+    pfx_path = os.path.join('./pfx', pfx_filename)
+    pfx_file.save(pfx_path)
 
-    # Download the document
-    response = requests.get(document_url)
-    document = response.content
+    # Substitua pela senha correta para o arquivo PKCS#12
+    password = request.form['password']
 
-    # Create a temporary file to store the document
-    document_file = tempfile.NamedTemporaryFile(delete=False)
-    document_file.write(document)
-    document_file.close()
+    # Definir o caminho do arquivo de saída
+    output_dir = './output'
+    # Cria o diretório se ele não existir
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, f'{pfx_filename}.pdf')
 
-    # Sign the document using endesive
-    dct = {
-        "sigflags": 3,
-        "contact": "mak@trisoft.com.pl",
-        "location": "Szczecin",
-        "signingdate": "20180731082642",
-        "reason": "Dokument podpisany cyfrowo",
-        "signature": "Dokument podpisany cyfrowo",
-        "signaturebox": (0, 0, 0, 0),
-    }
-    signed_document = pdf.cms.sign(document_file.name, dct,
-                                   private_key,
-                                   None,
-                                   [],
-                                   "sha256")
+    generate_key_and_sign(pfx_path, password, output_file)
 
-    # Delete the temporary file
-    os.unlink(document_file.name)
+    return 'Signature generated successfully!'
 
-    # Save the signed document to a temporary file
-    signed_document_file = tempfile.NamedTemporaryFile(delete=False)
-    signed_document_file.write(signed_document)
-    signed_document_file.close()
-
-    # Upload the signed document to S3
-    with open(signed_document_file.name, 'rb') as data:
-        s3.upload_fileobj(data, bucket_name, 'signed_document.pdf')
-
-    # Delete the temporary file
-    os.unlink(signed_document_file.name)
-
-    # Construct the URL of the signed document
-    url = f'https://{bucket_name}.s3.amazonaws.com/signed_document.pdf'
-
-    # Return the URL of the signed document
-    return jsonify({'url': url})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80, debug=True)
+    app.run(debug=True)
