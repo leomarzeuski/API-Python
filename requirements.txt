@@ -1,7 +1,6 @@
-Flask 
-pyOpenSSL 
-requests 
-reportlab 
-boto3 
-endesive
-
+Flask==2.0.1
+endesive==2.0.3
+requests==2.26.0
+boto3==1.18.33
+pyOpenSSL==20.0.1
+reportlab==3.5.68
