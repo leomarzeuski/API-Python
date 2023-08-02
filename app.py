@@ -3,20 +3,18 @@ from endesive import pdf
 import requests
 import tempfile
 import os
-from OpenSSL import crypto
 
 app = Flask(__name__)
 
 @app.route('/sign', methods=['POST'])
 def sign_document():
-    # Get the document to sign and the private key from the request
-    document = request.files['document'].read()
-    pfx_password = request.form.get('pfx_password')
+    # Get the URL of the document to sign and the private key from the request
+    document_url = request.form.get('document_url')
+    private_key = request.form.get('private_key')
 
-    # Load the private key and certificate from the PFX file
-    pfx = crypto.load_pkcs12(document, pfx_password)
-    private_key = pfx.get_privatekey()
-    certificate = pfx.get_certificate()
+    # Download the document
+    response = requests.get(document_url)
+    document = response.content
 
     # Create a temporary file to store the document
     document_file = tempfile.NamedTemporaryFile(delete=False)
@@ -35,7 +33,7 @@ def sign_document():
     }
     signed_document = pdf.cms.sign(document_file.name, dct,
                                    private_key,
-                                   certificate,
+                                   None,
                                    [],
                                    "sha256")
 
