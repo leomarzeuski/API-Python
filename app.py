@@ -1,85 +1,97 @@
-from flask import Flask, request, jsonify
-from endesive import pdf
+from flask import Flask, jsonify, request
 from OpenSSL import crypto
-import requests
-import tempfile
-import os
+from endesive import pdf
 import boto3
+import os
+import requests
+from datetime import datetime
+
+s3 = boto3.client('s3')
+bucket_name = "cyclic-lazy-erin-snail-gown-sa-east-1"
 
 app = Flask(__name__)
 
-s3 = boto3.client('s3')
-bucket_name = 'your_bucket_name'
+folder = '/tmp'
+
+def set_current_date_time():
+    current_datetime = datetime.now()
+    current_date_time = current_datetime.strftime("%Y%m%d_%H%M%S")
+    return current_date_time
+
+def download_file(url, local_path):
+    response = requests.get(url)
+    with open(local_path, 'wb') as file:
+        file.write(response.content)
 
 def load_certificate_and_key(pfx_path, password):
     with open(pfx_path, "rb") as f:
         pfx_data = f.read()
-
     pfx = crypto.load_pkcs12(pfx_data, password)
-
-    private_key = pfx.get_privatekey()
     certificate = pfx.get_certificate()
+    private_key = pfx.get_privatekey()
+    return certificate, private_key
 
-    return private_key, certificate
+def sign_pdf(input_pdf_path, output_pdf_path, private_key, certificate):
+    dct = {
+        "aligned": 0,
+        "sigflagsft": 1,
+        "sigpage": 0,
+        "sigbutton": True,
+        "sigfield": "Signature1",
+        "auto_sigfield": True,
+        "sigandcertify": True,
+        "contact": "email@example.com",
+        "location": "Localização",
+        "signingdate": "2020.02.20",
+        "reason": "Razão da assinatura",
+        "password": "1234",
+    }
+    datau = open(input_pdf_path, 'rb').read()
+    datas = pdf.cms.sign(datau, dct,
+                         private_key.to_cryptography_key(),
+                         certificate.to_cryptography(),
+                         [],
+                         "sha256"
+                         )
+    with open(output_pdf_path, 'wb') as fp:
+        fp.write(datau)
+        fp.write(datas)
 
 @app.route('/sign', methods=['POST'])
-def sign_document():
-    # Get the URL of the document to sign and the private key from the request
-    document_url = request.form.get('document_url')
-    pfx_password = request.form.get('pfx_password')
+def sign_pdf_endpoint():
+    try:
+        data = request.get_json()
+        pfx_file_url = data.get('pfx_file_url')
+        pfx_password = data.get('pfx_password')
+        pdf_url = data.get('pdf_url')
 
-    # Download the document
-    response = requests.get(document_url)
-    document = response.content
+        current_date_time = set_current_date_time()
+        local_pdf_file = f'/tmp/pdf_{current_date_time}.pdf'
+        pfx_path = f'/tmp/pfx_{current_date_time}.pfx'
 
-    # Create a temporary file to store the document
-    document_file = tempfile.NamedTemporaryFile(delete=False)
-    document_file.write(document)
-    document_file.close()
+        os.makedirs(folder, exist_ok=True)
 
-    # Load the certificate and key
-    private_key, certificate = load_certificate_and_key(document_file.name, pfx_password)
+        download_file(pfx_file_url, pfx_path)
+        download_file(pdf_url, local_pdf_file)
+        certificate, private_key = load_certificate_and_key(pfx_path, pfx_password)
 
-    # Define the signature dictionary
-    dct = {
-        "sigflags": 3,
-        "contact": "mak@trisoft.com.pl",
-        "location": "Szczecin",
-        "signingdate": "20180731082642",
-        "reason": "Dokument podpisany cyfrowo",
-        "signature": "Dokument podpisany cyfrowo",
-        "signaturebox": (0, 0, 0, 0),
-    }
+        sign_pdf(local_pdf_file, local_pdf_file, private_key, certificate)
 
-    # Sign the document using endesive
-    datau = open(document_file.name, "rb").read()
-    datas = pdf.cms.sign(datau, dct,
-                         private_key,
-                         certificate,
-                         [],
-                         "sha256")
+        with open(local_pdf_file, 'rb') as f:
+            s3.put_object(Body=f.read(), Bucket=bucket_name, Key=local_pdf_file)
 
-    # Delete the temporary file
-    os.unlink(document_file.name)
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={
+                'Bucket': bucket_name,
+                'Key': local_pdf_file
+            }
+        )
 
-    # Save the signed document to a temporary file
-    signed_document_file = tempfile.NamedTemporaryFile(delete=False)
-    signed_document_file.write(datau)
-    signed_document_file.write(datas)
-    signed_document_file.close()
-
-    # Upload the signed document to S3
-    with open(signed_document_file.name, 'rb') as data:
-        s3.upload_fileobj(data, bucket_name, 'signed_document.pdf')
-
-    # Delete the temporary file
-    os.unlink(signed_document_file.name)
-
-    # Construct the URL of the signed document
-    url = f'https://{bucket_name}.s3.amazonaws.com/signed_document.pdf'
-
-    # Return the URL of the signed document
-    return jsonify({'url': url})
+        return jsonify({'message': 'PDF signed successfully!', 'url': url}), 200
+    except Exception as e:
+        app.logger.error(f'Error: {e}')
+        return str(e), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80, debug=True)
+    app.run(debug=True)
